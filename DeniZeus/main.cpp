@@ -10,44 +10,42 @@
 #include <fcntl.h>
 #include <fstream>
 #include <sstream>
+#include "JSON.hpp"
+#include <urlmon.h>
+#pragma comment(lib, "urlmon.lib")
 
-//Netvar
-#define dwGlowObjectManager 0x5203288
-#define dwlocalPlayer 0xCB33D4
-#define dwForceJump 0x5166670
-#define clientState 0x58ACFC
-#define forceAttack 0x30F4BD8
-#define entityList 0x4CC3514
-#define clientAngle 0x4D10
-#define aimPunch 0x302C
-#define glowSize 52
-#define glowIndex 0xA3F8
-#define iTeamNum 0xF4
-#define vecOrigin 0x138
-#define vecViewOffset 0x108
-#define SpottedByMask 0x980
-#define iHealth 0x100
-#define fFlags 0x104
-#define boneMatrix 0x26A8
-#define bDormant 0xED
-#define m_flFallbackWear 0x31C0
-#define m_nFallbackPaintKit 0x31B8
-#define lifeState 0x25F
-#define m_iItemIDHigh 0x2FC0
-#define m_iEntityQuality 0x2FAC
-#define m_iItemDefinitionIndex 0x2FAA
-#define m_hActiveWeapon 0x2EF8
-#define m_hMyWeapons 0x2DF8
-#define m_nModelIndex 0x258
-#define CrosshairId 0xB390
+//Netvar Downloader Start
+DWORD dwGlowObjectManager;
+DWORD dwlocalPlayer;
+DWORD dwForceJump;
+DWORD clientState;
+DWORD forceAttack;
+DWORD entityList;
+DWORD clientAngle;
+DWORD aimPunch;
+DWORD glowIndex;
+DWORD iTeamNum;
+DWORD vecOrigin;
+DWORD vecViewOffset;
+DWORD SpottedByMask;
+DWORD iHealth;
+DWORD fFlags;
+DWORD boneMatrix;
+DWORD m_flFallbackWear;
+DWORD m_nFallbackPaintKit;
+DWORD m_iItemIDHigh;
+DWORD m_iEntityQuality;
+DWORD m_iItemDefinitionIndex;
+DWORD m_hActiveWeapon;
+DWORD m_hMyWeapons;
+DWORD CrosshairId;
+//End
+
+#define bDormant 0xED // It's a son of a bitch
 #define PLAYER_ON_FLOOR (1 << 0)
 #define PLAYER_CROUCHED 0x6
-//Netvar End
-
 #define M_RADPI 57.295779513082
 
-
-//Structs
 typedef struct Vector {
 	float x, y, z;
 }Vector;
@@ -87,11 +85,8 @@ struct PlayerStruct {
 //Stucts End
 
 PlayerStruct Players[64];
-
 NBQMemory mem;
-
 const char *title = "===== DeniZeus Simple External =====";
-
 int key = 0;
 int key1 = 0;
 float aimsmooth;
@@ -150,18 +145,15 @@ void entRefresher(HANDLE csgo,DWORD client) {
 			Sleep(5);
 	}
 }
-
 float scrToWorld(float X, float Y, float Z, float eX, float eY, float eZ)
 {
 	return(sqrtf((eX - X) * (eX - X) + (eY - Y) * (eY - Y) + (eZ - Z) * (eZ - Z)));
 }
-
 float lerp(float a, float b, float c) {
 	float aa = floor(a * 1000) / 1000;
 	float bb = floor(b * 1000) / 1000;
 	return (aa + c * (bb - aa));
 }
-
 void CalcAngle(Vector src, Vector dst, float *angles)
 {
 	float Delta[3] = { (src.x - dst.x), (src.y - dst.y), (src.z - dst.z) };
@@ -170,7 +162,6 @@ void CalcAngle(Vector src, Vector dst, float *angles)
 	angles[2] = 0.0f;
 	if (Delta[0] >= 0.0) angles[1] += 180.0f;
 }
-
 void Smooth(float x, float y, float *src, float *back, Vector flLocalAngles, float smooth, short weapon)
 {
 	float smoothdiff[2];
@@ -202,7 +193,6 @@ void Smooth(float x, float y, float *src, float *back, Vector flLocalAngles, flo
 	back[2] = 0.f;
 
 }
-
 float CloseEnt()
 {
 	//Variables
@@ -223,7 +213,6 @@ float CloseEnt()
 	}
 	return iIndex;
 }
-
 void retryAim(HANDLE csgo, DWORD client, DWORD engine) {
 
 DWORD clientbase = mem.ReadMemory<DWORD>(csgo, engine + clientState);
@@ -286,9 +275,6 @@ while (true) {
 	Sleep(5);
 }
 }
-
-
-
 //Skins List
 DWORD fallbackPaint1 = 37;
 DWORD fallbackPaint2 = 658;
@@ -322,9 +308,6 @@ DWORD fallbackPaint40 = 624;
 DWORD fallbackPaint60 = 445;
 DWORD fallbackPaint61 = 653;
 // End
-
-
-
 void skinsX(HANDLE csgo, DWORD client)
 {
 	const int itemIDHigh = -1;
@@ -425,16 +408,6 @@ void skinsX(HANDLE csgo, DWORD client)
 		}
 	}
 }
-/*
-void glowPlayer(HANDLE csgo, DWORD client, DWORD entity, int Health) {
-	mem.WriteMemory<float>(csgo, entity + 0x4, 1.f - (float)(Health / 100.f));
-	mem.WriteMemory<float>(csgo, entity + 0x8, (float)(Health / 100.f));
-	mem.WriteMemory<float>(csgo, entity + 0xC , 1.f);
-	mem.WriteMemory<float>(csgo, entity + 0x10, 1.f);
-	mem.WriteMemory<bool>(csgo, entity + 0x24, true);
-	mem.WriteMemory<bool>(csgo, entity + 0x25, false);
-}*/
-
 void glowPlayer(HANDLE csgo, DWORD client, GlowBase entity,DWORD entityadr, int Health) {
 	entity.r = 1.f - (float)(Health / 100.f);
 	entity.g = (float)(Health / 100.f);
@@ -444,10 +417,7 @@ void glowPlayer(HANDLE csgo, DWORD client, GlowBase entity,DWORD entityadr, int 
 	mem.WriteMemory<GlowBase>(csgo, entityadr + 0x4, entity);
 
 }
-
-
 HWND hWnd;
-
 void retryGlow(HANDLE csgo, DWORD client) {
 	isopened = true;
 	
@@ -564,7 +534,7 @@ void retryBunny(HANDLE csgo, DWORD client) {
 bool catched = false;
 bool repeat = false;
 std::string input;
-
+using json = nlohmann::json;
 	void main() {
 		std::ifstream myfile("skins.ini");
 		std::string line;
@@ -668,9 +638,51 @@ std::string input;
 					line_no++;
 				}
 		}
-
 		HWND console = GetConsoleWindow();
 		RECT r;
+		char* pPath;
+		pPath = getenv("APPDATA");
+		HRESULT hr = URLDownloadToFile(NULL, _T("https://raw.githubusercontent.com/frk1/hazedumper/master/csgo.json"), _T("netvars.json"), 0, NULL);
+		if (hr != S_OK) {
+			MessageBoxA(NULL, "Connection to github!", "Error", 0);
+			exit(0);
+		}
+		FILE* infile = fopen("netvars.json", "r");
+		fseek(infile, 0, SEEK_END);
+		long filesize = ftell(infile);
+		char* buf = new char[filesize + 1];
+		fseek(infile, 0, SEEK_SET);
+		fread(buf, 1, filesize, infile);
+		fclose(infile);
+		buf[filesize] = '\0';
+		std::stringstream ss;
+		ss.str(buf);
+		delete[] buf;
+		json netvars;
+		ss >> netvars;
+		dwGlowObjectManager = netvars["signatures"]["dwGlowObjectManager"];
+		dwlocalPlayer = netvars["signatures"]["dwLocalPlayer"];
+		dwForceJump = netvars["signatures"]["dwForceJump"];
+		clientState = netvars["signatures"]["dwClientState"];
+		forceAttack = netvars["signatures"]["dwForceAttack"];
+		entityList = netvars["signatures"]["dwEntityList"];
+		clientAngle = netvars["signatures"]["dwClientState_ViewAngles"];
+		glowIndex = netvars["netvars"]["m_iGlowIndex"];
+		iTeamNum = netvars["netvars"]["m_iTeamNum"];
+		vecOrigin = netvars["netvars"]["m_vecOrigin"];
+		vecViewOffset = netvars["netvars"]["m_vecViewOffset"];
+		SpottedByMask = netvars["netvars"]["m_bSpottedByMask"];
+		iHealth = netvars["netvars"]["m_iHealth"];
+		fFlags = netvars["netvars"]["m_fFlags"];
+		boneMatrix = netvars["netvars"]["m_dwBoneMatrix"];
+		m_flFallbackWear = netvars["netvars"]["m_flFallbackWear"];
+		m_nFallbackPaintKit = netvars["netvars"]["m_nFallbackPaintKit"];
+		m_iItemIDHigh = netvars["netvars"]["m_iItemIDHigh"];
+		m_iEntityQuality = netvars["netvars"]["m_iEntityQuality"];
+		m_iItemDefinitionIndex = netvars["netvars"]["m_iItemDefinitionIndex"];
+		m_hActiveWeapon = netvars["netvars"]["m_hActiveWeapon"];
+		m_hMyWeapons = netvars["netvars"]["m_hMyWeapons"];
+		CrosshairId = netvars["netvars"]["m_iCrosshairId"];
 		GetWindowRect(console, &r);
 		MoveWindow(console, r.left, r.top, 650, 500, TRUE);
 		SetConsoleTitle(title);
