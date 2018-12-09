@@ -12,35 +12,34 @@
 #include <sstream>
 
 //Netvar
-#define dwGlowObjectManager 0x51809B0
-#define dwlocalPlayer 0xC648AC
-#define dwForceJump 0x50E444C
-#define clientState 0x589B34
-#define forceAttack 0x3082DEC
-#define entityList 0x4C41704
+#define dwGlowObjectManager 0x5203288
+#define dwlocalPlayer 0xCB33D4
+#define dwForceJump 0x5166670
+#define clientState 0x58ACFC
+#define forceAttack 0x30F4BD8
+#define entityList 0x4CC3514
 #define clientAngle 0x4D10
-#define aimPunch 0x301C
+#define aimPunch 0x302C
 #define glowSize 52
-#define glowIndex 0xA344
-#define iTeamNum 0xF0
-#define vecOrigin 0x134
-#define vecViewOffset 0x104
-#define SpottedByMask 0x97C
-#define iHealth 0xFC
-#define fFlags 0x100
-#define boneMatrix 0x2698
-#define bDormant 0xE9
-#define m_iViewModelIndex 0x3210
-#define m_flFallbackWear 0x31B0
-#define m_nFallbackPaintKit 0x31A8
-#define lifeState 0x25B
-#define m_iItemIDHigh 0x2FB0
-#define m_iEntityQuality 0x2F9C
-#define m_iItemDefinitionIndex 0x2F9A
-#define m_hActiveWeapon 0x2EE8
-#define m_hMyWeapons 0x2DE8
-#define m_nModelIndex 0x254
-#define CrosshairId 0xB2DC
+#define glowIndex 0xA3F8
+#define iTeamNum 0xF4
+#define vecOrigin 0x138
+#define vecViewOffset 0x108
+#define SpottedByMask 0x980
+#define iHealth 0x100
+#define fFlags 0x104
+#define boneMatrix 0x26A8
+#define bDormant 0xED
+#define m_flFallbackWear 0x31C0
+#define m_nFallbackPaintKit 0x31B8
+#define lifeState 0x25F
+#define m_iItemIDHigh 0x2FC0
+#define m_iEntityQuality 0x2FAC
+#define m_iItemDefinitionIndex 0x2FAA
+#define m_hActiveWeapon 0x2EF8
+#define m_hMyWeapons 0x2DF8
+#define m_nModelIndex 0x258
+#define CrosshairId 0xB390
 #define PLAYER_ON_FLOOR (1 << 0)
 #define PLAYER_CROUCHED 0x6
 //Netvar End
