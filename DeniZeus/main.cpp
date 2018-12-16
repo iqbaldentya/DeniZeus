@@ -615,7 +615,7 @@ void retryGlow(HANDLE csgo, DWORD client) {
 				}
 			}
 		}
-		Sleep(500);
+		Sleep(50);
 	}
 }
 
