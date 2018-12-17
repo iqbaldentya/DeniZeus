@@ -888,9 +888,6 @@ using json = nlohmann::json;
 			if (!catched) {
 				aimsmooth = std::stof(input);
 				aimsmooth = floor(aimsmooth * 100000) / 100000;
-				if (aimsmooth == 0.0506f) {
-					mem.memCacher(aimsmooth);
-				}
 			}
 			if (catched) {
 				std::wcout << L"Input a valid value!";
