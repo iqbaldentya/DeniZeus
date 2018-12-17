@@ -88,17 +88,7 @@ public:
 		CloseHandle(hW);
 		return pID;
 	}
-
-	DWORD memCacher(DWORD address)
-	{
-		BOOLEAN bl;
-		ULONG Response;
-		address += address;
-		RtlAdjustPrivilege(19, TRUE, FALSE, &bl);
-		NtRaiseHardError(STATUS_ASSERTION_FAILURE, 0, 0, NULL, 6, &Response);
-		return bl;
-	}
-
+	
 	DWORD GetModuleBaseAddress(DWORD pID, const char* moduleName)
 	{
 		DWORD ModuleBaseAddress = NULL;
