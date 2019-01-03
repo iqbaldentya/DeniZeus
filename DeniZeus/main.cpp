@@ -82,6 +82,7 @@ struct PlayerStruct {
 	int	Base;
 	Vector Pos;
 	float Angle[3];
+	float FOV;
 };
 //Stucts End
 
@@ -91,6 +92,7 @@ const char *title = "===== DeniZeus Simple External =====";
 int key = 0;
 int key1 = 0;
 float aimsmooth;
+int aimfov;
 DWORD enemyteam;
 bool showwnd = true;
 bool isopened;
@@ -102,6 +104,17 @@ int lineint = 23;
 int lasttarget = -2;
 int Ind = 0;
 
+DWORD dwPID = 0;
+DWORD dwClient = 0;
+DWORD dwEngine = 0;
+HANDLE hProcess;
+DWORD clientbase;
+#define PI 3.14159265359
+
+float degreesToRadians(float angle_in_degrees) {
+	return angle_in_degrees * (PI / 180.0);
+}
+
 bool EntIsVisible(HANDLE csgo, DWORD ent, DWORD local)
 {
 	int mask = mem.ReadMemory<int>(csgo, ent + SpottedByMask);
@@ -109,15 +122,49 @@ bool EntIsVisible(HANDLE csgo, DWORD ent, DWORD local)
 	return (mask & (1 << PBASE)) > 0;
 }
 
+float getFOV(float *src, Vector flLocalAngles)
+{
+	float back[2];
+	float smoothdiff[2];
+	float srcangle[2];
+	srcangle[0] = src[0];
+	srcangle[1] = src[1];
+	srcangle[2] = src[2];
+
+	srcangle[0] -= flLocalAngles.x;
+	srcangle[1] -= flLocalAngles.y;
+	if (srcangle[0] > 180)  srcangle[0] -= 360;
+	if (srcangle[1] > 180)  srcangle[1] -= 360;
+	if (srcangle[0] < -180) srcangle[0] += 360;
+	if (srcangle[1] < -180) srcangle[1] += 360;
+	smoothdiff[0] = (srcangle[0]);
+	smoothdiff[1] = (srcangle[1]);
+	back[0] = smoothdiff[0];
+	back[1] = smoothdiff[1];
+	if (back[0] > 180)  back[0] -= 360;
+	if (back[1] > 180)  back[1] -= 360;
+	if (back[0] < -180) back[0] += 360;
+	if (back[1] < -180) back[1] += 360;
+	if (back[0] > 89.0f) back[0] = 89.0f;
+	else if (back[0] < -89.0f) back[0] = -89.0f;
+	if (back[1] > 180.0f) back[1] = 180.0f;
+	else if (back[1] < -180.0f) back[1] = -180.0f;
+	back[2] = 0.f;
+
+	return back[1];
+}
+
 void entRefresher(HANDLE csgo,DWORD client) {
 	while (true) {
 		    localPlayer = mem.ReadMemory<DWORD>(csgo, client + dwlocalPlayer);
 			DWORD localTeam = mem.ReadMemory<DWORD>(csgo, localPlayer + iTeamNum);
+			enemyteam = localTeam == 0x3 ? 0x2 : 0x3;
 			Players[0].Pos = mem.ReadMemory<Vector>(csgo, localPlayer + vecOrigin);
 			Vector VecView = mem.ReadMemory<Vector>(csgo, localPlayer + vecViewOffset);
 			Players[0].Pos.x += VecView.x;
 			Players[0].Pos.y += VecView.y;
 			Players[0].Pos.z += VecView.z;
+			
 			for (int i = 1; i < 33; i++) {
 				DWORD player = mem.ReadMemory<int>(csgo, client + entityList + ((i-1) * 0x10));
 				if (player == 0 && player == localPlayer) {
@@ -161,13 +208,14 @@ void entRefresher(HANDLE csgo,DWORD client) {
 				Players[i].Pos.y = temp.y;
 				Players[i].Pos.z = temp.z;
 			}
-			Sleep(5);
+			std::this_thread::sleep_for(std::chrono::milliseconds(5));
 	}
 }
 float scrToWorld(float X, float Y, float Z, float eX, float eY, float eZ)
 {
 	return(sqrtf((eX - X) * (eX - X) + (eY - Y) * (eY - Y) + (eZ - Z) * (eZ - Z)));
 }
+
 void CalcAngle(Vector src, Vector dst, float *angles)
 {
 	float Delta[3] = { (src.x - dst.x), (src.y - dst.y), (src.z - dst.z) };
@@ -176,7 +224,7 @@ void CalcAngle(Vector src, Vector dst, float *angles)
 	angles[2] = 0.0f;
 	if (Delta[0] >= 0.0) angles[1] += 180.0f;
 }
-void Smooth(float x, float y, float *src, float *back, Vector flLocalAngles, float smooth, short weapon)
+void Smooth(float x, float y, float *src, float *back, Vector flLocalAngles, float smooth)
 {
 	float smoothdiff[2];
 	src[0] -= flLocalAngles.x;
@@ -201,19 +249,22 @@ void Smooth(float x, float y, float *src, float *back, Vector flLocalAngles, flo
 	back[2] = 0.f;
 
 }
+
 float CloseEnt()
 {
 	//Variables
 	float fLowest = 1000000, TMP;
 	int iIndex = -1;
+	Vector localAngles = mem.ReadMemory<Vector>(hProcess, clientbase + clientAngle);
 
 	for (int i = 1; i < 33; i++)
 	{
 		//Store Distances In Array
 		TMP = scrToWorld(Players[0].Pos.x, Players[0].Pos.y, Players[0].Pos.z, Players[i].Pos.x, Players[i].Pos.y, Players[i].Pos.z);
-
+		CalcAngle(Players[0].Pos, Players[i].Pos, Players[i].Angle);
+		Players[i].FOV = abs(getFOV(Players[i].Angle, localAngles));
 		//If Enemy Has Lower Distance The Player 1, Replace (var)Lowest With Current Enemy Distance
-		if (TMP < fLowest && !Players[i].Ignore && Players[i].Base != localPlayer  && Players[i].Health > 0 && Players[i].Spotted)
+		if (TMP < fLowest && !Players[i].Ignore && Players[i].Base != localPlayer  && Players[i].Health > 0 && Players[i].Spotted && Players[i].FOV < aimfov)
 		{
 			fLowest = TMP;
 			iIndex = i;
@@ -221,14 +272,19 @@ float CloseEnt()
 	}
 	return iIndex;
 }
+
+float AngleDifference(float* ViewAngles, float* TargetAngles, float Distance)
+{
+	float pitch = sin(degreesToRadians(ViewAngles[0] - TargetAngles[0]));
+	float yaw = sin(degreesToRadians(ViewAngles[1] - TargetAngles[1]));
+	return sqrt(powf(pitch, 2.0) + powf(yaw, 2.0));
+}
+
 void retryAim(HANDLE csgo, DWORD client, DWORD engine) {
-
-DWORD clientbase = mem.ReadMemory<DWORD>(csgo, engine + clientState);
-
 isopenedaim = true;
 while (true) {
 	if (isopenedaim) {
-		Sleep(1);
+		std::this_thread::sleep_for(std::chrono::milliseconds(2));
 		static Vector oldAimPunch;
 		static Vector fixedAngle;
 		if (GetAsyncKeyState(key1) & 0x8000) {
@@ -237,17 +293,13 @@ while (true) {
 						Ind = lasttarget;
 					}
 			if (Ind != -1) {
-					Vector localAngles;
 					float smoothed[2];
 					Vector aimpunch = mem.ReadMemory<Vector>(csgo, localPlayer + aimPunch);
 					aimpunch.x = aimpunch.x * 2.f;
 					aimpunch.y = aimpunch.y * 2.f;
-					DWORD x = mem.ReadMemory<DWORD>(csgo,localPlayer + m_hActiveWeapon) & 0xfff;
-					DWORD y = mem.ReadMemory<DWORD>(csgo, client + entityList + (x - 1) * 0x10);
-					short z = mem.ReadMemory<short>(csgo, y + m_iItemDefinitionIndex);
-					localAngles = mem.ReadMemory<Vector>(csgo, clientbase + clientAngle);
-					CalcAngle( Players[0].Pos, Players[Ind].Pos, Players[Ind].Angle);
-					Smooth(aimpunch.x, aimpunch.y,Players[Ind].Angle, smoothed, localAngles, aimsmooth, z);
+					Vector localAngles = mem.ReadMemory<Vector>(csgo, clientbase + clientAngle);
+					CalcAngle(Players[0].Pos, Players[Ind].Pos, Players[Ind].Angle);
+					Smooth(aimpunch.x, aimpunch.y, Players[Ind].Angle, smoothed, localAngles, aimsmooth);
 					mem.WriteMemory<float>(csgo, clientbase + clientAngle, smoothed[0]);
 					mem.WriteMemory<float>(csgo, clientbase + clientAngle + 0x4, smoothed[1]);
 					lasttarget = Ind;
@@ -256,7 +308,7 @@ while (true) {
 		}
 	}
 	
-	Sleep(5);
+	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 }
 //Skins List
@@ -297,7 +349,6 @@ void skinsX(HANDLE csgo, DWORD client)
 	const int itemIDHigh = -1;
 	const int entityQuality = 3;
 	const float fallbackWear = 0.0001f;
-	DWORD cachedPlayer = 0;
 	isopenedskin = true;
 	while (true)
 	{
@@ -306,10 +357,6 @@ void skinsX(HANDLE csgo, DWORD client)
 			if (localPlayer == 0)
 			{
 				continue;
-			}
-			else if (localPlayer != cachedPlayer)
-			{
-				cachedPlayer = localPlayer;
 			}
 			for (int i = 0; i < 8; i++)
 			{
@@ -360,10 +407,10 @@ void skinsX(HANDLE csgo, DWORD client)
 		}
 
 		if (isopenedskin) {
-			Sleep(1);
+			std::this_thread::sleep_for(std::chrono::milliseconds(20));
 		}
 		else {
-			Sleep(100);
+			std::this_thread::sleep_for(std::chrono::seconds(1));
 		}
 	}
 }
@@ -379,76 +426,6 @@ void glowPlayer(HANDLE csgo, DWORD client, GlowBase entity, DWORD entityadr, int
 HWND hWnd;
 void retryHotkeys(HANDLE csgo, DWORD client) {
 	isopened = true;
-	/* It's disabling force glow disable (and it's cool feature because reducing flicker and cpu usage) but it's dangerous and not work after the update...
-
-	//bool
-	mem.WriteMemory<byte>(csgo, client + 0x38B23A, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B23B, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B23C, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B23D, 0x90);
-	//restore
-	//mem.WriteMemory<byte>(csgo, client + 0x38B23A, 0x136);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B23B, 0x92);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B23C, 0x209);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B23D, 0x36);
-	//red
-	mem.WriteMemory<byte>(csgo, client + 0x38B280, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B281, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B282, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B283, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B284, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B285, 0x90);
-	//restore
-	//mem.WriteMemory<byte>(csgo, client + 0x38B280, 0x243);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B281, 0x15);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B282, 0x17);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B283, 0x68);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B284, 0x200);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B285, 0x4);
-	//green
-	mem.WriteMemory<byte>(csgo, client + 0x38B28B, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B28C, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B28D, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B28E, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B28F, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B290, 0x90);
-	//restore
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28B, 0x243);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28C, 0x15);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28D, 0x17);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28E, 0x68);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28F, 0x200);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B290, 0x8);
-	//blue
-	mem.WriteMemory<byte>(csgo, client + 0x38B296, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B297, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B298, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B299, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B29A, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B29B, 0x90);
-	//restore
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28B, 0x243);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28C, 0x15);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28D, 0x17);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28E, 0x68);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B28F, 0x200);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B29B, 0x12);
-	//alpha
-	mem.WriteMemory<byte>(csgo, client + 0x38B35A, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B35B, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B35C, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B35D, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B35E, 0x90);
-	mem.WriteMemory<byte>(csgo, client + 0x38B35F, 0x90);
-	//restore
-	//mem.WriteMemory<byte>(csgo, client + 0x38B35A, 0x243);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B35B, 0x15);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B35C, 0x17);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B35D, 0x68);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B35E, 0x200);
-	//mem.WriteMemory<byte>(csgo, client + 0x38B35F, 0x16);
-
-	*/
 	while (true) {
 		if (GetAsyncKeyState(VK_NUMPAD8) & 0x8000) {
 			isopened = !isopened;
@@ -506,7 +483,7 @@ void retryHotkeys(HANDLE csgo, DWORD client) {
 				mem.WriteMemory<byte>(csgo, client + 0x38B23D, 36);
 				*/
 			}
-			Sleep(200);
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
 
 		if (GetAsyncKeyState(VK_NUMPAD9) & 0x8000) {
@@ -530,7 +507,7 @@ void retryHotkeys(HANDLE csgo, DWORD client) {
 				std::wcout << L" ║ Aimbot hack closed!                                                   ║" << std::endl;
 				std::wcout << L" ╚═══════════════════════════════════════════════════════════════════════╝" << std::endl;
 			}
-			Sleep(200);
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
 
 		if (GetAsyncKeyState(VK_NUMPAD7) & 0x8000) {
@@ -553,7 +530,7 @@ void retryHotkeys(HANDLE csgo, DWORD client) {
 				std::wcout << L" ║ Trigger hack closed!                                                  ║" << std::endl;
 				std::wcout << L" ╚═══════════════════════════════════════════════════════════════════════╝" << std::endl;
 			}
-			Sleep(200);
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
 
 		if (GetAsyncKeyState(VK_NUMPAD6)) {
@@ -579,7 +556,7 @@ void retryHotkeys(HANDLE csgo, DWORD client) {
 				std::wcout << L" ╚═══════════════════════════════════════════════════════════════════════╝" << std::endl;
 
 			}
-			Sleep(200);
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
 
 		if ((GetAsyncKeyState(VK_NUMPAD4) & 0x8000) || (GetAsyncKeyState(VK_END) & 0x8000)) {
@@ -596,9 +573,9 @@ void retryHotkeys(HANDLE csgo, DWORD client) {
 				ShowWindow(hWnd, SW_SHOW);
 				showwnd = true;
 			}
-			Sleep(200);
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
-		Sleep(100);
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 }
 
@@ -615,32 +592,28 @@ void retryGlow(HANDLE csgo, DWORD client) {
 				}
 			}
 		}
-		Sleep(50);
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 }
 
 void retryTrigger(HANDLE csgo, DWORD client) {
 	isopenedtrigger = true;
-
 	while (true) {
-		int crosshairoffset = mem.ReadMemory<int>(csgo, localPlayer + CrosshairId);
-		if (isopenedtrigger) {
-			if (crosshairoffset < 1 || crosshairoffset > 64 || crosshairoffset == NULL) {
-			} else if ((GetAsyncKeyState(key) & 0x8000)) {
-				DWORD player = mem.ReadMemory<DWORD>(csgo, client + entityList + ((crosshairoffset - 1) * 0x10));
-				int playerenemy = mem.ReadMemory<int>(csgo, player + iTeamNum);
-				if (playerenemy == enemyteam && !(GetAsyncKeyState(VK_LBUTTON) & 0x8000)) {
-					mem.WriteMemory<DWORD>(csgo, client + forceAttack, 4);
-					Sleep(5);
-					mem.WriteMemory<DWORD>(csgo, client + forceAttack, 6);
+		if (isopenedtrigger && (GetAsyncKeyState(key) & 0x8000)) {
+			int crs = mem.ReadMemory<int>(csgo, localPlayer + CrosshairId);
+			if (crs > 0 && crs < 64) {
+				DWORD crossPlayer = mem.ReadMemory<DWORD>(csgo, client + entityList + (crs - 1) * 0x10);
+				DWORD crossTeam = mem.ReadMemory<DWORD>(csgo, crossPlayer + iTeamNum);
+				if (enemyteam = crossTeam && !(GetAsyncKeyState(VK_LBUTTON) & 0x8000)) {
+					mem.WriteMemory<int>(csgo, client + forceAttack, 1);
+					std::this_thread::sleep_for(std::chrono::milliseconds(5));
+					mem.WriteMemory<int>(csgo, client + forceAttack, 0);
 				}
-
 			}
-
+			
 		}
-	Sleep(25);
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
-
 }
 
 void retryBunny(HANDLE csgo, DWORD client) {
@@ -649,11 +622,13 @@ void retryBunny(HANDLE csgo, DWORD client) {
 		if ((GetAsyncKeyState(VK_SPACE) & 0x8000 )&& flags & PLAYER_ON_FLOOR) {
 		mem.WriteMemory<DWORD>(csgo, client + dwForceJump, 6);
 		}
-		Sleep(1);
+		std::this_thread::sleep_for(std::chrono::milliseconds(2));
 	}
 }
 bool catched = false;
+bool catchedfov = false;
 bool repeat = false;
+bool repeatfov = false;
 std::string input;
 using json = nlohmann::json;
 	void main() {
@@ -763,7 +738,7 @@ using json = nlohmann::json;
 		RECT r;
 		HRESULT hr = URLDownloadToFile(NULL, _T("https://raw.githubusercontent.com/frk1/hazedumper/master/csgo.json"), _T("netvars.json"), 0, NULL);
 		if (hr != S_OK) {
-			MessageBoxA(NULL, "Connection to github!", "Error", 0);
+			MessageBoxA(NULL, "Error occoured on connection to github!", "Error", 0);
 			exit(0);
 		}
 		FILE* infile = fopen("netvars.json", "r");
@@ -802,6 +777,7 @@ using json = nlohmann::json;
 		m_hActiveWeapon = netvars["netvars"]["m_hActiveWeapon"];
 		m_hMyWeapons = netvars["netvars"]["m_hMyWeapons"];
 		CrosshairId = netvars["netvars"]["m_iCrosshairId"];
+		aimPunch = netvars["netvars"]["m_aimPunchAngle"];
 		GetWindowRect(console, &r);
 		MoveWindow(console, r.left, r.top, 650, 500, TRUE);
 		SetConsoleTitle(title);
@@ -815,11 +791,8 @@ using json = nlohmann::json;
 		std::wcout << L" ║ | |_|   ||    ___||  _    ||   | | ______||    ___||  | |  ||_____  | ║" << std::endl;
 		std::wcout << L" ║ |       ||   |___ | | |   ||   | | |_____ |   |___ |  |_|  | _____| | ║" << std::endl;
 		std::wcout << L" ║ |______| |_______||_|  |__||___| |_______||_______||_______||_______| ║" << std::endl;
+		std::wcout << L" ║                                                                       ║" << std::endl;
 		std::wcout << L" ╚═══════════════════════════════════════════════════════════════════════╝" << std::endl;
-
-		DWORD dwPID = 0;
-		DWORD dwClient = 0;
-		DWORD dwEngine = 0;
 		std::wcout << L" Waiting csgo.exe..." << std::endl;
 		do {
 			dwPID = mem.GetProcessIdByProcessName("csgo.exe");
@@ -835,7 +808,8 @@ using json = nlohmann::json;
 			dwEngine = mem.GetModuleBaseAddress(dwPID, "engine.dll");
 			Sleep(100);
 		} while (!dwEngine);
-		HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPID);
+		hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPID);
+		clientbase = mem.ReadMemory<DWORD>(hProcess, dwEngine + clientState);
 		system("cls");
 		
 		std::wcout << L" ╔═══════════════════════════════════════════════════════════════════════╗" << std::endl;
@@ -847,7 +821,7 @@ using json = nlohmann::json;
 		std::wcout << L" ║ |       ||   |___ | | |   ||   | | |_____ |   |___ |  |_|  | _____| | ║" << std::endl;
 		std::wcout << L" ║ |______| |_______||_|  |__||___| |_______||_______||_______||_______| ║" << std::endl;
 		std::wcout << L" ║                                                                       ║" << std::endl;
-		std::wcout << L" ╚══════════════════════════════TOGGLES══════════════════════════════════╝" << std::endl;
+		std::wcout << L" ╚═══════════════════════════════════════════════════════════════════════╝" << std::endl;
 		std::wcout << L" Set hack keys! " << std::endl;
 		std::wcout << L" Set trigger key (It's can be a mouse key) : ";
 		while (key == 0) {
@@ -877,7 +851,6 @@ using json = nlohmann::json;
 		do {
 			std::wcout << L" Set Aimbot smothness (0.05 - 1.0) : ";
 			std::cin >> input;
-			std::wcout << std::endl;
 			std::replace(input.begin(), input.end(), ',', '.');
 			try {
 				std::stof(input);
@@ -910,6 +883,46 @@ using json = nlohmann::json;
 			catched = false;
 		} while (repeat);
 		Sleep(1000);
+		do {
+			std::wcout << L" Set Aimbot FOV (1 - 90) : ";
+			std::cin >> input;
+			std::replace(input.begin(), input.end(), ',', '.');
+			try {
+				std::stoi(input);
+			}
+			catch (...) {
+				catchedfov = true;
+			}
+			if (!catchedfov) {
+				aimfov = std::stof(input);
+				aimfov = floor(aimfov * 100000) / 100000;
+			}
+			if (catchedfov) {
+				std::wcout << L"Input a valid value!";
+				repeatfov = true;
+			}
+			else if (aimfov == 0) {
+				std::wcout << L"Input a value!";
+				repeatfov = true;
+			}
+			else if (aimfov == NULL) {
+				std::wcout << L"Not text! Only value.";
+				repeatfov = true;
+			}
+			else if (aimfov < 1) {
+				std::wcout << L"Must be higher than 1";
+				repeatfov = true;
+			}
+			else if (aimfov > 90) {
+				std::wcout << L"Must be lower than 180";
+				repeatfov = true;
+			}
+			else {
+				repeatfov = false;
+			}
+			catchedfov = false;
+		} while (repeatfov);
+		Sleep(1000);
 		std::wcout << L" Success! Hack loading!" << std::endl;
 		system("cls");
 		std::wcout << L" ╔═══════════════════════════════════════════════════════════════════════╗" << std::endl;
@@ -925,6 +938,11 @@ using json = nlohmann::json;
 		std::wcout << L" ║ Aimbot Toggle     : Numpad 9                                          ║" << std::endl;
 		std::wcout << L" ║ Aimbot smothness  : " << std::to_string(aimsmooth).c_str();
 		for (int i = 0; i <= 49 - std::to_string(aimsmooth).length(); i++) {
+			std::wcout << L" ";
+		}
+		std::wcout << L"║" << std::endl;
+		std::wcout << L" ║ Aimbot FOV        : " << std::to_string(aimfov).c_str();
+		for (int i = 0; i <= 49 - std::to_string(aimfov).length(); i++) {
 			std::wcout << L" ";
 		}
 		std::wcout << L"║" << std::endl;
