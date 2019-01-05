@@ -100,7 +100,7 @@ bool isopenedskin;
 bool isopenedaim;
 bool isopenedtrigger;
 DWORD localPlayer;
-int lineint = 23;
+int lineint = 24;
 int lasttarget = -2;
 int Ind = 0;
 
