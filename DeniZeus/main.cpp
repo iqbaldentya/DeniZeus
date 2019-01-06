@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include "stdafx.h"
 #include "memory.h"
 #include <iostream>
@@ -611,7 +611,7 @@ void retryGlowFixed(HANDLE csgo, DWORD client) {
 		if (isopened && localPlayer) {
 			DWORD GlowObject = mem.ReadMemory<DWORD>(csgo, client + dwGlowObjectManager);
 			for (int i = 1; i < 33; i++) {
-				if (Players[i].Ignore) {
+				if (Players[i].Team != enemyteam) {
 					GlowBase entity = mem.ReadMemory<GlowBase>(csgo, GlowObject + ((Players[i].GlowIndex) * 0x38) + 0x4);
 					DWORD entityadr = GlowObject + ((Players[i].GlowIndex) * 0x38);
 					FixedGlowPlayerClose(csgo, client, entity, entityadr);
@@ -686,6 +686,7 @@ BOOL WINAPI ConsoleHandler(DWORD dwType)
 	case CTRL_LOGOFF_EVENT:
 	case CTRL_SHUTDOWN_EVENT:
 		recover();
+		Sleep(1000);
 		return TRUE;
 	default:
 		break;
@@ -1051,19 +1052,6 @@ std::string input1;
 				}
 				catchedglow = false;
 			} while (repeatglow);
-			if (glowtype) {
-				std::atexit(recover);
-				SetConsoleCtrlHandler(ConsoleHandler, TRUE);
-				byte cleaner[6];
-				std::fill(cleaner, cleaner + sizeof(cleaner), 144);
-				byte cleaner4[4];
-				std::fill(cleaner4, cleaner4 + sizeof(cleaner4), 144);
-				WriteProcessMemory(hProcess, (LPVOID)colorGlowFixerOffset, &cleaner, sizeof(cleaner), NULL);
-				WriteProcessMemory(hProcess, (LPVOID)((DWORD)colorGlowFixerOffset + 11), &cleaner, sizeof(cleaner), NULL);
-				WriteProcessMemory(hProcess, (LPVOID)((DWORD)colorGlowFixerOffset + 22), &cleaner, sizeof(cleaner), NULL);
-				WriteProcessMemory(hProcess, (LPVOID)((DWORD)alphaGlowFixerOffset), &cleaner, sizeof(cleaner), NULL);
-				WriteProcessMemory(hProcess, (LPVOID)((DWORD)occGlowFixerOffset), &cleaner4, sizeof(cleaner4), NULL);
-			}
 			Sleep(500);
 			if (infile1 == NULL) {
 				Json::Value settings;
@@ -1082,6 +1070,19 @@ std::string input1;
 				}
 			}
 		LOADEDCONFIG:
+			if (glowtype) {
+				std::atexit(recover);
+				SetConsoleCtrlHandler(ConsoleHandler, TRUE);
+				byte cleaner[6];
+				std::fill(cleaner, cleaner + sizeof(cleaner), 144);
+				byte cleaner4[4];
+				std::fill(cleaner4, cleaner4 + sizeof(cleaner4), 144);
+				WriteProcessMemory(hProcess, (LPVOID)colorGlowFixerOffset, &cleaner, sizeof(cleaner), NULL);
+				WriteProcessMemory(hProcess, (LPVOID)((DWORD)colorGlowFixerOffset + 11), &cleaner, sizeof(cleaner), NULL);
+				WriteProcessMemory(hProcess, (LPVOID)((DWORD)colorGlowFixerOffset + 22), &cleaner, sizeof(cleaner), NULL);
+				WriteProcessMemory(hProcess, (LPVOID)((DWORD)alphaGlowFixerOffset), &cleaner, sizeof(cleaner), NULL);
+				WriteProcessMemory(hProcess, (LPVOID)((DWORD)occGlowFixerOffset), &cleaner4, sizeof(cleaner4), NULL);
+			}
 		std::wcout << L" Success! Hack loading!" << std::endl;
 		system("cls");
 		std::wcout << L" ╔═══════════════════════════════════════════════════════════════════════╗" << std::endl;
