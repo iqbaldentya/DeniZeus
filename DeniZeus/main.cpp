@@ -625,7 +625,7 @@ void retryGlowFixed(HANDLE csgo, DWORD client) {
 				}
 			}
 		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	}
 }
 
