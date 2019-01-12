@@ -1,6 +1,4 @@
 # DeniZeus
 Simple External Hack
 
-<script>
-alert("test");
-</script>
+<p align="center"> Test6 </p>
